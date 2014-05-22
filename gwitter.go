@@ -7,6 +7,18 @@ import (
   // "io/ioutil"
 )
 
+func ConfigureConsumer(consumerKey string, consumerSecret string) (*oauth.Consumer) { 
+  c := oauth.NewConsumer(
+    consumerKey, 
+    consumerSecret, 
+    oauth.ServiceProvider{
+          RequestTokenUrl:   "https://api.twitter.com/oauth/request_token",
+          AuthorizeTokenUrl: "https://api.twitter.com/oauth/authorize",
+          AccessTokenUrl:    "https://api.twitter.com/oauth/access_token",
+        })
+  return c
+}
+
 func ConfigureApi(cfgFile string) (*oauth.Consumer, error) { 
  cfg, err := ReadFromFile(cfgFile)
   if err != nil {

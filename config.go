@@ -8,7 +8,7 @@ type Config struct {
   Main struct { 
     ConsumerKey string
     ConsumerSecret string
-    VerificationCode string
+    // VerificationCode string
   }
   AccessToken struct {
     Token string

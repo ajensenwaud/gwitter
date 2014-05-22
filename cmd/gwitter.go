@@ -4,30 +4,81 @@ import (
   "github.com/ajensenwaud/gwitter"
   "fmt"
   "log"
+  "flag"
+  "os"
+  "os/user"
 )
 
 func main() { 
-  consumer, err := gwitter.ConfigureApi("/home/aj/.gwitterrc")
-  if err != nil { 
-    log.Fatal("ConfigureApi error:", err)
-    return
+
+  configFlag := flag.Bool("configure", false, "Configure .gwitterrc")
+  consumerKeyFlag := flag.String("key", "", "Twitter API consumer key")
+  consumerSecretFlag := flag.String("secret", "", "Twitter API consumer secret")
+  postFlag := flag.String("post", "", "Post a new entry to Twitter")
+  listFlag := flag.Int("list", 0, "List the most recent tweets in your main feed")
+  allRecentFlag := flag.Bool("all", false, "List all unread tweets")
+  flag.Parse()
+
+  //fmt.Println("configFlag: ", *configFlag)
+  // fmt.Println("postFlag: ", *postFlag)
+  // fmt.Println("listFlag: ", *listFlag)
+  //fmt.Println("allRecentFlag: ", *allRecentFlag)
+
+  // If -configure:
+  if *configFlag { 
+    if len(*consumerKeyFlag) == 0 || len(*consumerSecretFlag) == 0 {
+      log.Fatal("You must specify the API consumer secret and consumer key in order to configure Gwitter")
+      os.Exit(-1)
+    }
+    cons := gwitter.ConfigureConsumer(*consumerKeyFlag, *consumerSecretFlag)
+    at, err := gwitter.AuthenticateFirstTime(cons)
+    if err != nil { 
+      log.Fatal("Error in authentication: ", err)
+      os.Exit(-1)
+    }
+    fmt.Println("Write the following to ~/.gwitterrc:")
+    fmt.Println("[Main]")
+    fmt.Println("ConsumerKey = ", *consumerKeyFlag)
+    fmt.Println("ConsumerSecret = ", *consumerSecretFlag)
+    fmt.Println("")
+    fmt.Println("[AccessToken]")
+    fmt.Println("Token = ", at.Token)
+    fmt.Println("Secret = ", at.Secret)
+    fmt.Println("ScreenName = ", at.ScreenName)
+    fmt.Println("UserId = ", at.UserId)
+    os.Exit(0)
   }
-  
-  at, err := gwitter.ConfigureAccessToken("/home/aj/.gwitterrc")
+
+
+  // If we are not configuring for the first time, it means we are either posting or listing
+  // This means we need to configure the consumer API and authenticate in order to do anything:
+  usr, err := user.Current()
   if err != nil { 
-    log.Fatal("ConfigureAccessToken error:", err)
+    log.Fatal(err) 
   }
-  /*
+  rcFilePath := usr.HomeDir + "/.gwitterrc"
+  consumer, err := gwitter.ConfigureApi(rcFilePath)
   if err != nil { 
-    fmt.Println(err)
+    log.Fatal("Error in loading .gwitterrc file", err)
+    os.Exit(-1)
   }
-  at, err := gwitter.AuthenticateFirstTime(consumer)
+  at, err := gwitter.ConfigureAccessToken(rcFilePath)
   if err != nil { 
-    fmt.Println(err)
-  } else { 
-    fmt.Println("OK: ", at)
-  }*/
-  t := "horse! neigh!"
-  fmt.Println("Sending the following tweet: ", t)
-  gwitter.PostTweet(t, at, consumer) 
+    log.Fatal("Error in loading access token: ", err)
+    os.Exit(-1)
+  } 
+
+  // If -post <msg> to Twitter
+  if len(*postFlag) > 0 { 
+    gwitter.PostTweet(*postFlag, at, consumer)
+    fmt.Println("Tweet posted!")
+  }
+
+  // TODO: Implement
+  if (*listFlag) > 0 { 
+  }
+
+  // TODO: Implement
+  if *allRecentFlag {
+  }
 }
