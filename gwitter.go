@@ -117,7 +117,7 @@ func PostTweet(t string, at *TwitterAccessToken, consumer *oauth.Consumer) {
 func GetTimeline(at *TwitterAccessToken, consumer *oauth.Consumer, count int) (*[]Tweet, error) {
 	var tweets []Tweet
 	resp, err := get("https://api.twitter.com/1.1/statuses/home_timeline.json",
-		map[string]string{"count": fmt.Sprintf("v", count)},
+		map[string]string{"count": fmt.Sprintf("%v", count)},
 		consumer,
 		at)
 

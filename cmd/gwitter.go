@@ -90,6 +90,7 @@ func main() {
 
 	// TODO: Implement
 	if (*listFlag) > 0 {
+		fmt.Println("listFlag: ", *listFlag)
 		tweets, err := gwitter.GetTimeline(at, consumer, *listFlag)
 		if err != nil {
 			log.Fatal(err)
@@ -106,9 +107,6 @@ func main() {
 func printTweets(tweets []gwitter.Tweet) {
 	for v := range tweets {
 		t := tweets[v]
-		// terminal.Stdout.Colorf("@{w}%v\n", t.Text)
-		// terminal.Stdout.Colorf("@{y}%s @{w}at @{c}%v@{w}:", t.User.Name, t.CreatedAt).Nl()
-		//	terminal.Stdout.Colorf("@{|}@{/}%s", t.Text).Nl()
 		fmt.Printf(term.FgYellow+"%s "+term.FgWhite+"(@"+term.FgBlue+"%s"+term.FgWhite+") at "+term.FgCyan+"%v"+term.Reset+":\n", t.User.Name, t.User.ScreenName, t.CreatedAt)
 		fmt.Printf(term.FgWhite+"%s\n\n", t.Text)
 	}
