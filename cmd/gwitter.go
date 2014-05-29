@@ -19,6 +19,8 @@ import (
 	"log"
 	"os"
 	"os/user"
+	"strings"
+	"time"
 
 	"github.com/ajensenwaud/gwitter"
 	"github.com/ajensenwaud/gwitter/term"
@@ -26,6 +28,7 @@ import (
 
 func main() {
 
+	progFlag := flag.Bool("bar", false, "Show progress indicator")
 	configFlag := flag.Bool("configure", false, "Configure .gwitterrc")
 	consumerKeyFlag := flag.String("key", "", "Twitter API consumer key")
 	consumerSecretFlag := flag.String("secret", "", "Twitter API consumer secret")
@@ -104,6 +107,41 @@ func main() {
 
 	// TODO: Implement
 	if *allRecentFlag {
+	}
+
+	if *progFlag {
+		/*
+			t := "Fetching tweets..."
+			i := 0
+			indicators := "|/-\\|/-\\"
+			fmt.Print("[ ")
+			for {
+				if i == len(indicators)-1 {
+					i = 0
+				}
+				fmt.Printf("%c ] %s", indicators[i], t)
+				time.Sleep(time.Second)
+				fmt.Printf(strings.Repeat("\b", 4+len(t)))
+				i = i + 1
+			}
+			fmt.Println("Hest")
+		} */
+		showProgressIndicator("Fetching tweets", time.Millisecond)
+	}
+}
+
+func showProgressIndicator(t string, timeout time.Duration) {
+	i := 0
+	indicators := "|/-\\|/-\\"
+	fmt.Print("[ ")
+	for {
+		if i == len(indicators)-1 {
+			i = 0
+		}
+		fmt.Printf("%c ] %s", indicators[i], t)
+		time.Sleep(timeout)
+		fmt.Printf(strings.Repeat("\b", 4+len(t)))
+		i = i + 1
 	}
 }
 
