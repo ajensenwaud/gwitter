@@ -84,13 +84,16 @@ func main() {
 
 	// If -post <msg> to Twitter
 	if len(*postFlag) > 0 {
-		gwitter.PostTweet(*postFlag, at, consumer)
+		err := gwitter.PostTweet(*postFlag, at, consumer)
+		if err != nil {
+			fmt.Fprintf(os.Stderr, "Caught error posting tweet: %s\n", err)
+			os.Exit(-1)
+		}
 		fmt.Println("Tweet posted!")
 	}
 
 	// TODO: Implement
 	if (*listFlag) > 0 {
-		fmt.Println("listFlag: ", *listFlag)
 		tweets, err := gwitter.GetTimeline(at, consumer, *listFlag)
 		if err != nil {
 			log.Fatal(err)

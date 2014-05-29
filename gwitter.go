@@ -22,6 +22,19 @@ import (
 	// "io/ioutil"
 )
 
+type GwitterError struct {
+	Message string
+	Code    int
+}
+
+func (err GwitterError) Throw(code int, msg string) *GwitterError {
+	return &GwitterError{Code: code, Message: msg}
+}
+
+func (err GwitterError) Error() string {
+	return err.Message
+}
+
 func ConfigureConsumer(consumerKey string, consumerSecret string) *oauth.Consumer {
 	c := oauth.NewConsumer(
 		consumerKey,
@@ -103,15 +116,18 @@ func twitterAccessTokenToOauthAccessToken(at *TwitterAccessToken) *oauth.AccessT
 	return &oauth.AccessToken{Token: at.Token, Secret: at.Secret, AdditionalData: map[string]string{"user_id": at.UserId, "screen_name": at.ScreenName}}
 }
 
-func PostTweet(t string, at *TwitterAccessToken, consumer *oauth.Consumer) {
-
+func PostTweet(t string, at *TwitterAccessToken, consumer *oauth.Consumer) error {
+	if len(t) > 140 {
+		errstr := fmt.Sprintf("Your tweet exceeds 140 characters (it is exactly %d character(s) long)", len(t))
+		return GwitterError{Code: 1, Message: errstr}
+	}
 	oauthAt := twitterAccessTokenToOauthAccessToken(at)
 	resp, err := consumer.Post("https://api.twitter.com/1.1/statuses/update.json", map[string]string{"status": t}, oauthAt)
 	if err != nil {
 		log.Fatal(err)
 	}
 	fmt.Println(resp)
-
+	return nil
 }
 
 func GetTimeline(at *TwitterAccessToken, consumer *oauth.Consumer, count int) (*[]Tweet, error) {
