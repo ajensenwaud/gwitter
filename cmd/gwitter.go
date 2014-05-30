@@ -87,21 +87,27 @@ func main() {
 
 	// If -post <msg> to Twitter
 	if len(*postFlag) > 0 {
+		stopcn := make(chan bool)
+		go showProgressIndicator("Posting tweet...", time.Millisecond*10, stopcn)
 		err := gwitter.PostTweet(*postFlag, at, consumer)
+		stopcn <- true
 		if err != nil {
 			fmt.Fprintf(os.Stderr, "Caught error posting tweet: %s\n", err)
 			os.Exit(-1)
 		}
-		fmt.Println("Tweet posted!")
+		fmt.Println("\nTweet posted!")
 	}
 
-	// TODO: Implement
 	if (*listFlag) > 0 {
+		stopcn := make(chan bool)
+		go showProgressIndicator("Fetching tweets from timeline...", time.Millisecond*10, stopcn)
 		tweets, err := gwitter.GetTimeline(at, consumer, *listFlag)
+		stopcn <- true
 		if err != nil {
 			log.Fatal(err)
 			os.Exit(-1)
 		}
+		fmt.Println("\n")
 		printTweets(*tweets)
 	}
 
@@ -126,22 +132,32 @@ func main() {
 			}
 			fmt.Println("Hest")
 		} */
-		showProgressIndicator("Fetching tweets", time.Millisecond)
+		stopcn := make(chan bool)
+		go showProgressIndicator("Fetching tweets", time.Millisecond, stopcn)
+		time.Sleep(10 * time.Second)
+		stopcn <- true
+		close(stopcn)
+		fmt.Println("Stopped.")
 	}
 }
 
-func showProgressIndicator(t string, timeout time.Duration) {
+func showProgressIndicator(t string, timeout time.Duration, stopcn chan bool) {
 	i := 0
 	indicators := "|/-\\|/-\\"
 	fmt.Print("[ ")
 	for {
-		if i == len(indicators)-1 {
-			i = 0
+		select {
+		case <-stopcn:
+			// Received notification to stop
+		default:
+			if i == len(indicators)-1 {
+				i = 0
+			}
+			fmt.Printf("%c ] %s", indicators[i], t)
+			time.Sleep(timeout)
+			fmt.Printf(strings.Repeat("\b", 4+len(t)))
+			i = i + 1
 		}
-		fmt.Printf("%c ] %s", indicators[i], t)
-		time.Sleep(timeout)
-		fmt.Printf(strings.Repeat("\b", 4+len(t)))
-		i = i + 1
 	}
 }
 
