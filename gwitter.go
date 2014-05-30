@@ -19,7 +19,6 @@ import (
 	"net/http"
 
 	"github.com/mrjones/oauth"
-	// "io/ioutil"
 )
 
 type GwitterError struct {
@@ -140,6 +139,12 @@ func GetTimeline(at *TwitterAccessToken, consumer *oauth.Consumer, count int) (*
 	if err != nil {
 		return nil, err
 	}
+
+	// DEBUG:
+	// defer resp.Body.Close()
+	// contents, err := ioutil.ReadAll(resp.Body)
+	//fmt.Printf("%s\n", string(contents))
+	// END DEBUG
 
 	err = decodeResponse(resp, &tweets)
 	if err != nil {

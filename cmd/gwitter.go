@@ -28,7 +28,6 @@ import (
 
 func main() {
 
-	progFlag := flag.Bool("bar", false, "Show progress indicator")
 	configFlag := flag.Bool("configure", false, "Configure .gwitterrc")
 	consumerKeyFlag := flag.String("key", "", "Twitter API consumer key")
 	consumerSecretFlag := flag.String("secret", "", "Twitter API consumer secret")
@@ -44,27 +43,7 @@ func main() {
 
 	// If -configure:
 	if *configFlag {
-		if len(*consumerKeyFlag) == 0 || len(*consumerSecretFlag) == 0 {
-			log.Fatal("You must specify the API consumer secret and consumer key in order to configure Gwitter")
-			os.Exit(-1)
-		}
-		cons := gwitter.ConfigureConsumer(*consumerKeyFlag, *consumerSecretFlag)
-		at, err := gwitter.AuthenticateFirstTime(cons)
-		if err != nil {
-			log.Fatal("Error in authentication: ", err)
-			os.Exit(-1)
-		}
-		fmt.Println("Write the following to ~/.gwitterrc:")
-		fmt.Println("[Main]")
-		fmt.Println("ConsumerKey = ", *consumerKeyFlag)
-		fmt.Println("ConsumerSecret = ", *consumerSecretFlag)
-		fmt.Println("")
-		fmt.Println("[AccessToken]")
-		fmt.Println("Token = ", at.Token)
-		fmt.Println("Secret = ", at.Secret)
-		fmt.Println("ScreenName = ", at.ScreenName)
-		fmt.Println("UserId = ", at.UserId)
-		os.Exit(0)
+		configureAndExit(consumerKeyFlag, consumerSecretFlag)
 	}
 
 	// If we are not configuring for the first time, it means we are either posting or listing
@@ -114,31 +93,6 @@ func main() {
 	// TODO: Implement
 	if *allRecentFlag {
 	}
-
-	if *progFlag {
-		/*
-			t := "Fetching tweets..."
-			i := 0
-			indicators := "|/-\\|/-\\"
-			fmt.Print("[ ")
-			for {
-				if i == len(indicators)-1 {
-					i = 0
-				}
-				fmt.Printf("%c ] %s", indicators[i], t)
-				time.Sleep(time.Second)
-				fmt.Printf(strings.Repeat("\b", 4+len(t)))
-				i = i + 1
-			}
-			fmt.Println("Hest")
-		} */
-		stopcn := make(chan bool)
-		go showProgressIndicator("Fetching tweets", time.Millisecond, stopcn)
-		time.Sleep(10 * time.Second)
-		stopcn <- true
-		close(stopcn)
-		fmt.Println("Stopped.")
-	}
 }
 
 func showProgressIndicator(t string, timeout time.Duration, stopcn chan bool) {
@@ -165,6 +119,39 @@ func printTweets(tweets []gwitter.Tweet) {
 	for v := range tweets {
 		t := tweets[v]
 		fmt.Printf(term.FgYellow+"%s "+term.FgWhite+"(@"+term.FgBlue+"%s"+term.FgWhite+") at "+term.FgCyan+"%v"+term.Reset+":\n", t.User.Name, t.User.ScreenName, t.CreatedAt)
+
+		if len(t.InReplyToScreenName) > 0 {
+			fmt.Println("(In reply to: ", t.InReplyToScreenName, ")")
+		}
+		fmt.Println("RT status", t.RetweetedStatus)
+		if t.RetweetedStatus != nil {
+			rt := *t.RetweetedStatus
+			fmt.Println(term.FgWhite, "RT to ", term.FgYellow, rt.User.Name, term.FgWhite, "(@", rt.User.ScreenName, "):", term.FgBlue, rt.Text)
+		}
 		fmt.Printf(term.FgWhite+"%s\n\n", t.Text)
 	}
+}
+
+func configureAndExit(consumerKeyFlag *string, consumerSecretFlag *string) {
+	if len(*consumerKeyFlag) == 0 || len(*consumerSecretFlag) == 0 {
+		log.Fatal("You must specify the API consumer secret and consumer key in order to configure Gwitter")
+		os.Exit(-1)
+	}
+	cons := gwitter.ConfigureConsumer(*consumerKeyFlag, *consumerSecretFlag)
+	at, err := gwitter.AuthenticateFirstTime(cons)
+	if err != nil {
+		log.Fatal("Error in authentication: ", err)
+		os.Exit(-1)
+	}
+	fmt.Println("Write the following to ~/.gwitterrc:")
+	fmt.Println("[Main]")
+	fmt.Println("ConsumerKey = ", *consumerKeyFlag)
+	fmt.Println("ConsumerSecret = ", *consumerSecretFlag)
+	fmt.Println("")
+	fmt.Println("[AccessToken]")
+	fmt.Println("Token = ", at.Token)
+	fmt.Println("Secret = ", at.Secret)
+	fmt.Println("ScreenName = ", at.ScreenName)
+	fmt.Println("UserId = ", at.UserId)
+	os.Exit(0)
 }
