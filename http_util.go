@@ -15,7 +15,7 @@ type ApiError struct {
 }
 
 func (err ApiError) Error() string {
-	return fmt.Sprintf("Twitter erturned status %d: %s", err.StatusCode, err.Body)
+	return fmt.Sprintf("Twitter returned status %d: %s", err.StatusCode, err.Body)
 }
 
 type TwitterErrorResponse struct {
