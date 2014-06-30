@@ -123,7 +123,6 @@ func printTweets(tweets []gwitter.Tweet) {
 		if len(t.InReplyToScreenName) > 0 {
 			fmt.Println("(In reply to: ", t.InReplyToScreenName, ")")
 		}
-		fmt.Println("RT status", t.RetweetedStatus)
 		if t.RetweetedStatus != nil {
 			rt := *t.RetweetedStatus
 			fmt.Println(term.FgWhite, "RT to ", term.FgYellow, rt.User.Name, term.FgWhite, "(@", rt.User.ScreenName, "):", term.FgBlue, rt.Text)
