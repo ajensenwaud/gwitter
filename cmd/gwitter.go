@@ -118,7 +118,12 @@ func showProgressIndicator(t string, timeout time.Duration, stopcn chan bool) {
 func printTweets(tweets []gwitter.Tweet) {
 	for v := range tweets {
 		t := tweets[v]
-		fmt.Printf(term.FgYellow+"%s "+term.FgWhite+"(@"+term.FgBlue+"%s"+term.FgWhite+") at "+term.FgCyan+"%v"+term.Reset+":\n", t.User.Name, t.User.ScreenName, t.CreatedAt)
+		tm, err := time.Parse("Mon Jan 2 15:04:05 -0700 2006", t.CreatedAt)
+		if err != nil {
+			fmt.Fprintln(os.Stderr, "time.Parse() failed: ", err)
+			return
+		}
+		fmt.Printf(term.FgYellow+"%s "+term.FgWhite+"(@"+term.FgBlue+"%s"+term.FgWhite+") at "+term.FgCyan+"%v"+term.Reset+":\n", t.User.Name, t.User.ScreenName, tm.Local())
 
 		if len(t.InReplyToScreenName) > 0 {
 			fmt.Println("(In reply to: ", t.InReplyToScreenName, ")")
