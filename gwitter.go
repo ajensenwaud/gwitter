@@ -22,8 +22,8 @@ import (
 	"strings"
 	"time"
 
-	"github.com/ajensenwaud/gwitter"
-	"github.com/ajensenwaud/gwitter/term"
+	"github.com/ajensenwaud/gwitter/lib"
+	"github.com/ajensenwaud/gwitter/lib/term"
 )
 
 func main() {

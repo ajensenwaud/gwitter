@@ -8,6 +8,6 @@ Current dependencies:
 This project is currently a toy, but will be expanded over time into a fully functioning client. Contributions are much welcome!
 
 To-do list: 
-* Implement proper deserialization of JSON objects to enum for key objects
-* Once done, implement "get latest tweets" and write to command line
-* If xterm/rxvt-color TERMTYPE is supported, use proper colour for showing latest tweets
+* Non-colour flag for better $PAGER support (piping through less looks weird)
+* 'tail -f' style support where gwitter will run in the background and output new tweets as they appear in the main feed
+* Simple search functionality
