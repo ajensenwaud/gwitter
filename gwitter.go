@@ -26,21 +26,26 @@ import (
 	"github.com/ajensenwaud/gwitter/lib/term"
 )
 
+const (
+  VERSION = "0.9.9"
+)
+
 func main() {
 
+  // Parse command line flags:
 	configFlag := flag.Bool("configure", false, "Configure .gwitterrc")
 	consumerKeyFlag := flag.String("key", "", "Twitter API consumer key")
 	consumerSecretFlag := flag.String("secret", "", "Twitter API consumer secret")
 	postFlag := flag.String("post", "", "Post a new entry to Twitter")
 	listFlag := flag.Int("list", 0, "List the most recent tweets in your main feed")
 	allRecentFlag := flag.Bool("all", false, "List all unread tweets")
+  noColoursFlag := flag.Bool("nocolour", false, "Do not use terminal colouring for output (especially useful when piping Gwitter output to $PAGER)")
+
 	flag.Parse()
 
-	//fmt.Println("configFlag: ", *configFlag)
-	// fmt.Println("postFlag: ", *postFlag)
-	// fmt.Println("listFlag: ", *listFlag)
-	//fmt.Println("allRecentFlag: ", *allRecentFlag)
-
+  if flag.NFlag() == 0 { 
+    usageAndExit()
+  }
 	// If -configure:
 	if *configFlag {
 		configureAndExit(consumerKeyFlag, consumerSecretFlag)
@@ -87,7 +92,7 @@ func main() {
 			os.Exit(-1)
 		}
 		fmt.Println("\n")
-		printTweets(*tweets)
+		printTweets(*tweets, !*noColoursFlag)
 	}
 
 	// TODO: Implement
@@ -115,7 +120,7 @@ func showProgressIndicator(t string, timeout time.Duration, stopcn chan bool) {
 	}
 }
 
-func printTweets(tweets []gwitter.Tweet) {
+func printTweets(tweets []gwitter.Tweet, colour bool) {
 	for v := range tweets {
 		t := tweets[v]
 		tm, err := time.Parse("Mon Jan 2 15:04:05 -0700 2006", t.CreatedAt)
@@ -123,14 +128,21 @@ func printTweets(tweets []gwitter.Tweet) {
 			fmt.Fprintln(os.Stderr, "time.Parse() failed: ", err)
 			return
 		}
-		fmt.Printf(term.FgYellow+"%s "+term.FgWhite+"(@"+term.FgBlue+"%s"+term.FgWhite+") at "+term.FgCyan+"%v"+term.Reset+":\n", t.User.Name, t.User.ScreenName, tm.Local())
-
-		if len(t.InReplyToScreenName) > 0 {
+    if colour { 
+		  fmt.Printf(term.FgYellow+"%s "+term.FgWhite+"(@"+term.FgBlue+"%s"+term.FgWhite+") at "+term.FgCyan+"%v"+term.Reset+":\n", t.User.Name, t.User.ScreenName, tm.Local())
+    } else { 
+		  fmt.Printf("%s (@%s) at %v:\n", t.User.Name, t.User.ScreenName, tm.Local())
+    }
+    if len(t.InReplyToScreenName) > 0 {
 			fmt.Println("(In reply to: ", t.InReplyToScreenName, ")")
 		}
 		if t.RetweetedStatus != nil {
 			rt := *t.RetweetedStatus
-			fmt.Println(term.FgWhite, "RT to ", term.FgYellow, rt.User.Name, term.FgWhite, "(@", rt.User.ScreenName, "):", term.FgBlue, rt.Text)
+      if colour { 
+			  fmt.Println(term.FgWhite, "RT to ", term.FgYellow, rt.User.Name, term.FgWhite, "(@", rt.User.ScreenName, "):", term.FgBlue, rt.Text)
+      } else { 
+        fmt.Println("RT to ", rt.User.Name, "(@", rt.User.ScreenName, "): ", rt.Text)
+      }
 		}
 		fmt.Printf(term.FgWhite+"%s\n\n", t.Text)
 	}
@@ -158,4 +170,16 @@ func configureAndExit(consumerKeyFlag *string, consumerSecretFlag *string) {
 	fmt.Println("ScreenName = ", at.ScreenName)
 	fmt.Println("UserId = ", at.UserId)
 	os.Exit(0)
+}
+
+func usageAndExit() { 
+  showHeader()
+  fmt.Println("Error: you did not specify any flags, cannot continue")
+  fmt.Println("Tip: run gwitter --help for help on command line flags")
+  os.Exit(-1)
+}
+
+func showHeader() { 
+  fmt.Println("Gwitter version", VERSION, "- copyright Anders Jensen-Waud 2014-2015")
+  fmt.Println("Gwitter is open source software distributed under the BEER-WARE license")
 }
