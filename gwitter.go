@@ -11,172 +11,151 @@
  * -----------------------------------------------------------------------------------
  */
 
-package gwitter
+package main
 
 import (
+	"flag"
 	"fmt"
 	"log"
-	"net/http"
+	"os"
+	"os/user"
+	"strings"
+	"time"
 
-	"github.com/mrjones/oauth"
+	"github.com/ajensenwaud/gwitter"
+	"github.com/ajensenwaud/gwitter/term"
 )
 
-type GwitterError struct {
-	Message string
-	Code    int
-}
+func main() {
 
-func (err GwitterError) Throw(code int, msg string) *GwitterError {
-	return &GwitterError{Code: code, Message: msg}
-}
+	configFlag := flag.Bool("configure", false, "Configure .gwitterrc")
+	consumerKeyFlag := flag.String("key", "", "Twitter API consumer key")
+	consumerSecretFlag := flag.String("secret", "", "Twitter API consumer secret")
+	postFlag := flag.String("post", "", "Post a new entry to Twitter")
+	listFlag := flag.Int("list", 0, "List the most recent tweets in your main feed")
+	allRecentFlag := flag.Bool("all", false, "List all unread tweets")
+	flag.Parse()
 
-func (err GwitterError) Error() string {
-	return err.Message
-}
+	//fmt.Println("configFlag: ", *configFlag)
+	// fmt.Println("postFlag: ", *postFlag)
+	// fmt.Println("listFlag: ", *listFlag)
+	//fmt.Println("allRecentFlag: ", *allRecentFlag)
 
-func ConfigureConsumer(consumerKey string, consumerSecret string) *oauth.Consumer {
-	c := oauth.NewConsumer(
-		consumerKey,
-		consumerSecret,
-		oauth.ServiceProvider{
-			RequestTokenUrl:   "https://api.twitter.com/oauth/request_token",
-			AuthorizeTokenUrl: "https://api.twitter.com/oauth/authorize",
-			AccessTokenUrl:    "https://api.twitter.com/oauth/access_token",
-		})
-	return c
-}
-
-func ConfigureApi(cfgFile string) (*oauth.Consumer, error) {
-	cfg, err := ReadFromFile(cfgFile)
-	if err != nil {
-		return nil, err
+	// If -configure:
+	if *configFlag {
+		configureAndExit(consumerKeyFlag, consumerSecretFlag)
 	}
-	c := oauth.NewConsumer(
-		cfg.Main.ConsumerKey,
-		cfg.Main.ConsumerSecret,
-		oauth.ServiceProvider{
-			RequestTokenUrl:   "https://api.twitter.com/oauth/request_token",
-			AuthorizeTokenUrl: "https://api.twitter.com/oauth/authorize",
-			AccessTokenUrl:    "https://api.twitter.com/oauth/access_token",
-		})
-	return c, nil
-}
 
-func ConfigureAccessToken(cfgFile string) (*TwitterAccessToken, error) {
-	cfg, err := ReadFromFile(cfgFile)
-	if err != nil {
-		return nil, err
-	}
-	at := &TwitterAccessToken{
-		Token:      cfg.AccessToken.Token,
-		Secret:     cfg.AccessToken.Secret,
-		UserId:     cfg.AccessToken.UserId,
-		ScreenName: cfg.AccessToken.ScreenName}
-	return at, nil
-
-}
-func AuthenticateFirstTime(c *oauth.Consumer) (*TwitterAccessToken, error) {
-	requestToken, url, err := c.GetRequestTokenAndUrl("oob")
-
+	// If we are not configuring for the first time, it means we are either posting or listing
+	// This means we need to configure the consumer API and authenticate in order to do anything:
+	usr, err := user.Current()
 	if err != nil {
 		log.Fatal(err)
-		log.Fatal("GetRequestTokenAndUrl failed")
-		return nil, err
 	}
-	fmt.Println("Go to this url: " + url)
-	fmt.Print("Enter the verification code here:")
-
-	verificationCode := ""
-	fmt.Scanln(&verificationCode)
-
-	accessToken, err := c.AuthorizeToken(requestToken, verificationCode)
+	rcFilePath := usr.HomeDir + "/.gwitterrc"
+	consumer, err := gwitter.ConfigureApi(rcFilePath)
 	if err != nil {
-		log.Fatal(err)
-		log.Fatal("AuthorizeToken failed")
-		return nil, err
+		log.Fatal("Error in loading .gwitterrc file", err)
+		os.Exit(-1)
 	}
-	fmt.Println("Add the following information to .gwitterrc:")
+	at, err := gwitter.ConfigureAccessToken(rcFilePath)
+	if err != nil {
+		log.Fatal("Error in loading access token: ", err)
+		os.Exit(-1)
+	}
+
+	// If -post <msg> to Twitter
+	if len(*postFlag) > 0 {
+		stopcn := make(chan bool)
+		go showProgressIndicator("Posting tweet...", time.Millisecond*10, stopcn)
+		err := gwitter.PostTweet(*postFlag, at, consumer)
+		stopcn <- true
+		if err != nil {
+			fmt.Fprintf(os.Stderr, "Caught error posting tweet: %s\n", err)
+			os.Exit(-1)
+		}
+		fmt.Println("\nTweet posted!")
+	}
+
+	if (*listFlag) > 0 {
+		stopcn := make(chan bool)
+		go showProgressIndicator("Fetching tweets from timeline...", time.Millisecond*10, stopcn)
+		tweets, err := gwitter.GetTimeline(at, consumer, *listFlag)
+		stopcn <- true
+		if err != nil {
+			log.Fatal(err)
+			os.Exit(-1)
+		}
+		fmt.Println("\n")
+		printTweets(*tweets)
+	}
+
+	// TODO: Implement
+	if *allRecentFlag {
+	}
+}
+
+func showProgressIndicator(t string, timeout time.Duration, stopcn chan bool) {
+	i := 0
+	indicators := "|/-\\|/-\\"
+	fmt.Print("[ ")
+	for {
+		select {
+		case <-stopcn:
+			// Received notification to stop
+		default:
+			if i == len(indicators)-1 {
+				i = 0
+			}
+			fmt.Printf("%c ] %s", indicators[i], t)
+			time.Sleep(timeout)
+			fmt.Printf(strings.Repeat("\b", 4+len(t)))
+			i = i + 1
+		}
+	}
+}
+
+func printTweets(tweets []gwitter.Tweet) {
+	for v := range tweets {
+		t := tweets[v]
+		tm, err := time.Parse("Mon Jan 2 15:04:05 -0700 2006", t.CreatedAt)
+		if err != nil {
+			fmt.Fprintln(os.Stderr, "time.Parse() failed: ", err)
+			return
+		}
+		fmt.Printf(term.FgYellow+"%s "+term.FgWhite+"(@"+term.FgBlue+"%s"+term.FgWhite+") at "+term.FgCyan+"%v"+term.Reset+":\n", t.User.Name, t.User.ScreenName, tm.Local())
+
+		if len(t.InReplyToScreenName) > 0 {
+			fmt.Println("(In reply to: ", t.InReplyToScreenName, ")")
+		}
+		if t.RetweetedStatus != nil {
+			rt := *t.RetweetedStatus
+			fmt.Println(term.FgWhite, "RT to ", term.FgYellow, rt.User.Name, term.FgWhite, "(@", rt.User.ScreenName, "):", term.FgBlue, rt.Text)
+		}
+		fmt.Printf(term.FgWhite+"%s\n\n", t.Text)
+	}
+}
+
+func configureAndExit(consumerKeyFlag *string, consumerSecretFlag *string) {
+	if len(*consumerKeyFlag) == 0 || len(*consumerSecretFlag) == 0 {
+		log.Fatal("You must specify the API consumer secret and consumer key in order to configure Gwitter")
+		os.Exit(-1)
+	}
+	cons := gwitter.ConfigureConsumer(*consumerKeyFlag, *consumerSecretFlag)
+	at, err := gwitter.AuthenticateFirstTime(cons)
+	if err != nil {
+		log.Fatal("Error in authentication: ", err)
+		os.Exit(-1)
+	}
+	fmt.Println("Write the following to ~/.gwitterrc:")
+	fmt.Println("[Main]")
+	fmt.Println("ConsumerKey = ", *consumerKeyFlag)
+	fmt.Println("ConsumerSecret = ", *consumerSecretFlag)
+	fmt.Println("")
 	fmt.Println("[AccessToken]")
-	fmt.Println("Token: " + accessToken.Token)
-	fmt.Println("Secret: " + accessToken.Secret)
-	fmt.Println("ScreenName: " + accessToken.AdditionalData["screen_name"])
-	fmt.Println("UserId: " + accessToken.AdditionalData["user_id"])
-
-	tat := &TwitterAccessToken{
-		Token:      accessToken.Token,
-		Secret:     accessToken.Secret,
-		ScreenName: accessToken.AdditionalData["screen_name"],
-		UserId:     accessToken.AdditionalData["user_id"],
-	}
-	return tat, nil
-}
-
-func twitterAccessTokenToOauthAccessToken(at *TwitterAccessToken) *oauth.AccessToken {
-	return &oauth.AccessToken{Token: at.Token, Secret: at.Secret, AdditionalData: map[string]string{"user_id": at.UserId, "screen_name": at.ScreenName}}
-}
-
-func PostTweet(t string, at *TwitterAccessToken, consumer *oauth.Consumer) error {
-	if len(t) > 140 {
-		errstr := fmt.Sprintf("Your tweet exceeds 140 characters (it is exactly %d character(s) long)", len(t))
-		return GwitterError{Code: 1, Message: errstr}
-	}
-	oauthAt := twitterAccessTokenToOauthAccessToken(at)
-	resp, err := consumer.Post("https://api.twitter.com/1.1/statuses/update.json", map[string]string{"status": t}, oauthAt)
-	if err != nil {
-		log.Fatal(err)
-	}
-	fmt.Println(resp)
-	return nil
-}
-
-func GetTimeline(at *TwitterAccessToken, consumer *oauth.Consumer, count int) (*[]Tweet, error) {
-	var tweets []Tweet
-	resp, err := get("https://api.twitter.com/1.1/statuses/home_timeline.json",
-		map[string]string{"count": fmt.Sprintf("%v", count)},
-		consumer,
-		at)
-
-	if err != nil {
-		return nil, err
-	}
-
-	// DEBUG:
-	// defer resp.Body.Close()
-	// contents, err := ioutil.ReadAll(resp.Body)
-	//fmt.Printf("%s\n", string(contents))
-	// END DEBUG
-
-	err = decodeResponse(resp, &tweets)
-	if err != nil {
-		return nil, err
-	}
-
-	return &tweets, nil
-}
-
-func get(url string, qs map[string]string, consumer *oauth.Consumer, at *TwitterAccessToken) (*http.Response, error) {
-	resp, err := query("get", url, qs, consumer, at)
-	return resp, err
-}
-
-func post(url string, qs map[string]string, consumer *oauth.Consumer, at *TwitterAccessToken) (*http.Response, error) {
-	resp, err := query("post", url, qs, consumer, at)
-	return resp, err
-}
-
-func query(t string, url string, qs map[string]string, consumer *oauth.Consumer, at *TwitterAccessToken) (*http.Response, error) {
-	oauthAt := twitterAccessTokenToOauthAccessToken(at)
-	var resp *http.Response
-	var err error
-	if t == "get" {
-		resp, err = consumer.Get(url, qs, oauthAt)
-	} else if t == "post" {
-		resp, err = consumer.Post(url, qs, oauthAt)
-	}
-
-	if err != nil {
-		log.Fatal(err)
-		return nil, err
-	}
-	return resp, nil
+	fmt.Println("Token = ", at.Token)
+	fmt.Println("Secret = ", at.Secret)
+	fmt.Println("ScreenName = ", at.ScreenName)
+	fmt.Println("UserId = ", at.UserId)
+	os.Exit(0)
 }
